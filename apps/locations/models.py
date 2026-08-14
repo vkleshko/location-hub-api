@@ -1,5 +1,9 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
+
 from apps.categories.models import Category
 
 
@@ -51,6 +55,22 @@ class Location(models.Model):
         verbose_name="Updated at",
     )
 
+    @property
+    def rating(self):
+        avg = self.reviews.aggregate(models.Avg("rating"))["rating__avg"]
+        return round(avg, 1) if avg else 0.0
+
+    @property
+    def views_7_days(self):
+        seven_days_ago = timezone.now() - timedelta(days=7)
+        return self.views.filter(created_at__gte=seven_days_ago).count()
+
+    @property
+    def popularity(self):
+        reviews_count = self.reviews.count()
+        calc = (self.rating * 2.0) + (reviews_count * 1.5) + (self.views_7_days * 0.2)
+        return round(calc, 2)
+
     class Meta:
         verbose_name = "Location"
         verbose_name_plural = "Locations"
@@ -61,3 +81,12 @@ class Location(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class LocationView(models.Model):
+    location = models.ForeignKey(
+        Location,
+        on_delete=models.CASCADE,
+        related_name="views",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
