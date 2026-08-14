@@ -4,6 +4,8 @@ from django.db.models import F, FloatField, Avg, Count, Q, ExpressionWrapper
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .filters import LocationFilter
@@ -11,6 +13,7 @@ from .models import Location, LocationView
 from django.core.cache import cache
 from .permissions import IsAuthorOrAdminOrReadOnly
 from .serializers import LocationSerializer
+from .utils import generate_locations_export
 
 
 class LocationViewSet(viewsets.ModelViewSet):
@@ -79,6 +82,18 @@ class LocationViewSet(viewsets.ModelViewSet):
             cache.set(cache_key, response.data)
 
         return response
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="export",
+        permission_classes=[IsAuthenticated],
+    )
+    def export_locations(self, request):
+        export_format = request.query_params.get("file_format", "json").lower()
+        queryset = self.filter_queryset(self.get_queryset())
+
+        return generate_locations_export(queryset, export_format)
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
